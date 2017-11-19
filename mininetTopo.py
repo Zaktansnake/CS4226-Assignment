@@ -29,7 +29,10 @@ class TreeTopo(Topo):
         numofswitches = int(firstline[1])
         numoflinks = int(firstline[2])
 
-        # Add Hosts
+        # You can write other functions as you need.
+
+        # Add hosts
+        # > self.addHost('h%d' % [HOST NUMBER])
         hosts = []
 
         for i in xrange(numofhosts):
@@ -38,7 +41,9 @@ class TreeTopo(Topo):
 
         print hosts
 
-        # Add Switches
+        # Add switches
+        # > sconfig = {'dpid': "%016x" % [SWITCH NUMBER]}
+        # > self.addSwitch('s%d' % [SWITCH NUMBER], **sconfig)
         switches = []
 
         for j in xrange(numofswitches):
@@ -49,32 +54,20 @@ class TreeTopo(Topo):
         print switches
         print self.switches()
 
-        # Add Links
-        self.linkConfigs = []
+        # Add links
+        # > self.addLink([HOST1], [HOST2])
+        self.linkconfigs = []
 
         for k in xrange(numoflinks):
             link = filereader.readline().strip().split(',')
-            print link
-            self.linkConfigs.append(link)
+            self.linkconfigs.append(link)
             firstnode = link[0]
             secondnode = link[1]
             # Links are added without bandwidth as bandwidth is added in the queue
             self.addLink(firstnode, secondnode)
+            print link
 
         print self.links(True, False, True)
-
-
-    # You can write other functions as you need.
-
-    # Add hosts
-    # > self.addHost('h%d' % [HOST NUMBER])
-
-    # Add switches
-    # > sconfig = {'dpid': "%016x" % [SWITCH NUMBER]}
-    # > self.addSwitch('s%d' % [SWITCH NUMBER], **sconfig)
-
-    # Add links
-    # > self.addLink([HOST1], [HOST2])
 
 def startNetwork():
     info('** Creating the tree network\n')
@@ -89,7 +82,7 @@ def startNetwork():
     net.start()
 
     def getLinkSpeed(firstnode, secondnode):
-        for i in topo.linkConfigs:
+        for i in topo.linkconfigs:
             if firstnode == i[0] and secondnode == i[1]:
                 return int(i[2]) * 1000000
 
@@ -103,21 +96,18 @@ def startNetwork():
     #            -- --id=@q0 create queue other-config:max-rate=[LINK SPEED] other-config:min-rate=[LINK SPEED] \
     #            -- --id=@q1 create queue other-config:min-rate=[X] \
     #            -- --id=@q2 create queue other-config:max-rate=[Y]')
-
-    # Get Switch interfaces
     for j in topo.links(True, False, True):
         for k in topo.switches():
             linkinfo = j[2]
             for l in [1, 2]:
                 if linkinfo["node%i" % (l)] == k:
-                    networkints += 1
                     port = linkinfo["port%i" % (l)]
+                    interface = "%s-eth%s" % (k, port)
                     firstnode = linkinfo["node1"]
                     secondnode = linkinfo["node2"]
                     linkspeed = getLinkSpeed(firstnode, secondnode)
                     xspeed = 100000000 # 100 mbps
                     yspeed = 50000000 # 50 mbps
-                    interface = "%s-eth%s" % (k, port)
 
                     # OS System Call
                     os.system("sudo ovs-vsctl -- set Port %s qos=@newqos \
@@ -126,7 +116,9 @@ def startNetwork():
                             -- --id=@q1 create queue other-config:min-rate=%i \
                             -- --id=@q2 create queue other-config:max-rate=%i" % (interface, linkspeed, linkspeed, linkspeed, xspeed, yspeed))
 
-    print "QoS set up on %i interfaces" % (networkints)
+                    networkints += 1
+
+    print "QoS has been set up on %i interfaces" % (networkints)
 
     info('** Running CLI\n')
     CLI(net)

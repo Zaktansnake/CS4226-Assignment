@@ -45,7 +45,7 @@ class Controller(EventMixin):
             message.data = event.ofp
             message.priority = 1000
             event.connection.send(message)
-            log.info("Message with queue ID %i sent via port %i\n", q_id, outport)
+            log.info("Packet with queue ID %i sent via port %i\n", q_id, outport)
             return
 
         # Check the packet and decide how to route the packet
@@ -84,12 +84,12 @@ class Controller(EventMixin):
 
             # If multicast, flood
             if destination.is_multicast:
-                flood("Multicast to %s -- flooding" % (destination))
+                flood("Multicast to Port %s -- flooding" % (destination))
                 return
 
             # If destination port is not found, flood
             if destination not in self.macToPort[dpid]:
-                flood("Port for %s unknown -- flooding" % (destination))
+                flood("Destination Port %s unknown -- flooding" % (destination))
                 return
 
             outport = self.macToPort[dpid][destination]
