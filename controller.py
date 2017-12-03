@@ -71,6 +71,8 @@ class Controller(EventMixin):
                 destinationip = arppacket.protodst
             else:
                 log.info("Packet is Unknown type %s", packet.type)
+                sourceip = None
+                destinationip = None
 
             # Check if source and destination ip is in same premium service class
             qid = 0
@@ -169,7 +171,7 @@ class Controller(EventMixin):
 
             # From second host to first host
             source = policy[1]
-            destination = policy[2]
+            destination = policy[0]
             port = policy[2]
 
             messagetwo = of.ofp_flow_mod()
