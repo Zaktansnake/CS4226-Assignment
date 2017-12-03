@@ -41,7 +41,7 @@ class Controller(EventMixin):
             log.info("Installing flow for %s:%i -> %s:%i", source, port, destination, outport)
             message = of.ofp_flow_mod()
             message.match = of.ofp_match.from_packet(packet, port)
-            message.actions.append(of.ofp_action_output(port = outport, queue_id = q_id))
+            message.actions.append(of.ofp_action_enqueue(port = outport, queue_id = q_id))
             message.data = event.ofp
             message.priority = 1000
             event.connection.send(message)
@@ -177,7 +177,7 @@ class Controller(EventMixin):
 
             messagetwo = of.ofp_flow_mod()
             messagetwo.priority = 2000
-            messagetwo.actions.append(of.ofp_action_output(port=of.OFPP_NONE))
+            messagetwo.actions.append(of.ofp_action_output(port = of.OFPP_NONE))
             messagetwo.match.dl_type = 0x800
             messagetwo.match.nw_proto = 6
             messagetwo.match.nw_src = IPAddr(source)
