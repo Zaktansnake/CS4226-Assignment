@@ -11,6 +11,7 @@ from mininet.log import setLogLevel, info
 from mininet.cli import CLI
 from mininet.topo import Topo
 from mininet.link import Link
+from mininet.link import TCLink
 from mininet.node import RemoteController
 
 net = None
@@ -74,8 +75,8 @@ def startNetwork():
     topo = TreeTopo()
 
     global net
-    net = Mininet(topo=topo, link = Link,
-                  controller=lambda name: RemoteController(name, ip='SERVER IP'),
+    net = Mininet(topo=topo, link = TCLink,
+                  controller=lambda name: RemoteController(name, ip='127.0.0.1'),
                   listenPort=6633, autoSetMacs=True)
 
     info('** Starting the network\n')
