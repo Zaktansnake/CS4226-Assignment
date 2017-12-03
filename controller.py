@@ -53,7 +53,8 @@ class Controller(EventMixin):
             log.info("Receiving packet %s from port %i", packet, port)
 
             # Store the port from where the packet comes from
-            self.macmap[dpid][source] = port
+            if self.macmap[dpid].get(source) == None:
+                self.macmap[dpid][source] = port
 
             # Get source and destination IP address
             sourceip = None
@@ -123,7 +124,7 @@ class Controller(EventMixin):
 
 
     def _handle_ConnectionUp(self, event):
-        dpid = dpid_to_str(event.dpid)
+        dpid = event.dpid
         log.debug("Switch %s has come up.", dpid)
 
         self.macmap[dpid] = {}
