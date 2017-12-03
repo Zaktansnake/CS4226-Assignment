@@ -3,10 +3,6 @@ Please add your name: David Chong Yong Ming
 Please add your matric number: A0116633L
 '''
 
-import sys
-import os
-from sets import Set
-
 from pox.core import core
 
 import pox.openflow.libopenflow_01 as of
@@ -14,7 +10,6 @@ import pox.openflow.discovery
 import pox.openflow.spanning_tree
 
 from pox.lib.revent import *
-from pox.lib.util import dpid_to_str
 from pox.lib.addresses import IPAddr, EthAddr
 
 log = core.getLogger()
@@ -23,9 +18,9 @@ class Controller(EventMixin):
     def __init__(self):
         self.listenTo(core.openflow)
         core.openflow_discovery.addListeners(self)
-        # Used to store MAC address and ports
+        # Used to store MAC address and ports (Task 2)
         self.macandport = {}
-        # For Premium Service Class
+        # For Premium Service Class (Task 4)
         self.psc = {}
         return
         
@@ -38,32 +33,32 @@ class Controller(EventMixin):
         source = packet.src
         destination = packet.dst
 
-        # install entries to the route table
+        # install entries to the route table (Task 2/4)
         def install_enqueue(event, packet, outport, q_id):
             log.info("Installing flow for %s:%i -> %s:%i", source, port, destination, outport)
             message = of.ofp_flow_mod()
             message.match = of.ofp_match.from_packet(packet, port)
             message.actions.append(of.ofp_action_enqueue(port = outport, queue_id = q_id))
             message.data = event.ofp
-            # Set to Premium Service Channel priority
+            # Set to Premium Service Channel priority (Task 4)
             message.priority = 1000
             event.connection.send(message)
             log.info("Packet with queue ID %i sent via port %i\n", q_id, outport)
             return
 
-        # Check the packet and decide how to route the packet
+        # Check the packet and decide how to route the packet (Task 2/3/4)
         def forward(message = None):
             log.info("Receiving packet %s from port %i", packet, port)
 
-            # Store the port from where the packet comes from if empty
+            # Store the port from where the packet comes from if empty (Task 2)
             if self.macandport[dpid].get(source) == None:
                 self.macandport[dpid][source] = port
 
-            # Get source and destination IP address from the packet
+            # Get source and destination IP address from the packet (Task 3/4)
             sourceip = None
             destinationip = None
 
-            # Checks the packet type to determine where to send the packet
+            # Checks the packet type to determine where to send the packet (Task 3/4)
             if packet.type == packet.IP_TYPE:
                 log.info("Packet is IP type %s", packet.type)
                 ippacket = packet.payload
@@ -79,12 +74,12 @@ class Controller(EventMixin):
                 sourceip = None
                 destinationip = None
 
-            # Check if source and destination ip is in same premium service class
+            # Check if source and destination ip is in same premium service class (Task 4)
             qid = 0
 
-            # If there is no address, packet is sent to the default queue 0
-            # If the IP addresses are in the same switch, packet is sent to queue 1
-            # If IP addresses are different and no in the same switch, packet is sent to queue 2
+            # If there is no address, packet is sent to a default queue 0
+            # If the IP addresses are in the list of PSC, packet is sent via the Premium Queue (Task 4)
+            # If IP addresses are different and not in the list of PSC, packet is sent via the Normal Queue (Task 3)
             if sourceip == None or destinationip == None:
                 qid = 0
             elif is_same_class(sourceip, destinationip):
@@ -92,22 +87,22 @@ class Controller(EventMixin):
             else:
                 qid = 2
 
-            # If packet desinations indicates it is a multicast, packet is flooded
+            # If packet desinations indicates it is a multicast, packet is flooded (Task 2)
             if destination.is_multicast:
                 flood("Multicast to Port %s -- flooding" % (destination))
                 return
 
-            # If packet destination port is not found, packet is flooded
+            # If packet destination port is not found, packet is flooded (Task 2)
             if destination not in self.macandport[dpid]:
                 flood("Destination Port %s unknown -- flooding" % (destination))
                 return
 
-            # Install the packet to the route table
+            # Add the node port to the route table for learning switch (Task 2)
             outport = self.macandport[dpid][destination]
             install_enqueue(event, packet, outport, qid)
             return
 
-        # When it knows nothing about the destination, flood but don't install the rule
+        # When it knows nothing about the destination, flood but don't install the rule (Task 2)
         def flood (message = None):
             log.info(message)
             floodmsg = of.ofp_packet_out()
@@ -118,7 +113,7 @@ class Controller(EventMixin):
             log.info("Flood Message sent via port %i\n", of.OFPP_FLOOD)
             return
 
-        # Check if IPs belong to same premium service class
+        # Check if IPs belong to the list of premium service class (Task 4)
         def is_same_class(sourceip, destinationip):
             for i in self.psc[dpid]:
                 if sourceip in i and destination in i:
@@ -142,19 +137,19 @@ class Controller(EventMixin):
         self.macandport[dpid] = {}
         self.psc[dpid] = []
 
-        # Reads in policy.in file for Firewall rules
+        # Reads in policy.in file for Firewall rules (Task 3)
         filename = "policy.in"
         filereader = open(filename, "r")
         firstline = filereader.readline().split(' ')
 
-        # First line of the file indicates the number of policies, followed by number of Premium Service Class
+        # First line of the file indicates the number of policies, followed by number of Premium Service Class (Task 3/4)
         numofpolicies = int(firstline[0])
         numofpsc = int(firstline[1])
 
-        # fpolicies is used to store the Firewall Policies that are written from second line onwards
+        # fpolicies is used to store the Firewall Policies that are written from second line onwards (Task 3)
         fpolicies = []
 
-        # Lines from the file are read in and stores Firewall Policies
+        # Lines from the file are read in and stores Firewall Policies (Task 3)
         for i in xrange(numofpolicies):
             line = filereader.readline().strip().split(',')
             source = line[0]
@@ -162,14 +157,14 @@ class Controller(EventMixin):
             port = line[2]
             fpolicies.append((source, destination, port))
 
-        # After lines are read for Firewall Policies, lines are read for Premium Service Class
+        # After lines are read for Firewall Policies, lines are read for Premium Service Class (Task 4)
         for j in xrange(numofpsc):
             line = filereader.readline().strip().split(',')
             self.psc[dpid].append(line)
 
         log.info("Premium Service Class List: %s", self.psc[dpid])
 
-        # Send the firewall policies to the switch
+        # Send the firewall policies to the switch (Task 3)
         def sendFirewallPolicy(connection, policy):
 
             # From first host to second host
@@ -205,11 +200,11 @@ class Controller(EventMixin):
             log.info("Firewall Policy: source = %s, destination = %s, port = %s", source, destination, port)
             return
 
-        # Calls the function sendFirewallPolicy for all policies
+        # Calls the function sendFirewallPolicy to apply firewall policies (Task 3)
         for i in fpolicies:
             sendFirewallPolicy(event.connection, i)
 
-        # Does not need to call additional methods for Premium Service Classes
+        # Does not need to call additional methods for Premium Service Classes (Task 4)
         for j in self.psc:
             pass
 
