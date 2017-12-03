@@ -10,8 +10,10 @@ from mininet.net import Mininet
 from mininet.log import setLogLevel, info
 from mininet.cli import CLI
 from mininet.topo import Topo
-from mininet.link import Link
+
+# Used TCLink instead of original mininet Link for implementation
 from mininet.link import TCLink
+
 from mininet.node import RemoteController
 
 net = None
@@ -22,17 +24,19 @@ class TreeTopo(Topo):
         # Initialize topology
         Topo.__init__(self)
 
+        # Gets the names and number of hosts, switches and links from topology.in
         filename = "topology.in"
         filereader = open(filename, "r")
         firstline = filereader.readline().split(' ')
 
+        # Number of hosts, switches and links are stored in the first line of topology.in
         numofhosts = int(firstline[0])
         numofswitches = int(firstline[1])
         numoflinks = int(firstline[2])
 
         # You can write other functions as you need.
 
-        # Add hosts
+        # Add hosts to the mininet
         # > self.addHost('h%d' % [HOST NUMBER])
         hosts = []
 
@@ -40,9 +44,10 @@ class TreeTopo(Topo):
             host = self.addHost('H%d' % (i+1))
             hosts.append(host)
 
+        # Print the added hosts for user to see
         print hosts
 
-        # Add switches
+        # Add switches to the mininet
         # > sconfig = {'dpid': "%016x" % [SWITCH NUMBER]}
         # > self.addSwitch('s%d' % [SWITCH NUMBER], **sconfig)
         switches = []
@@ -52,10 +57,11 @@ class TreeTopo(Topo):
             switch = self.addSwitch('S%d' % (j+1), **sconfig)
             switches.append(switch)
 
+        # Print the added switches for user to see
         print switches
         print self.switches()
 
-        # Add links
+        # Add links to the mininet
         # > self.addLink([HOST1], [HOST2])
         self.linkconfigs = []
 
@@ -68,12 +74,14 @@ class TreeTopo(Topo):
             self.addLink(firstnode, secondnode)
             print link
 
+        # Print the added links for user to see
         print self.links(True, False, True)
 
 def startNetwork():
     info('** Creating the tree network\n')
     topo = TreeTopo()
 
+    # Changed server IP to 127.0.0.1 for the host-only adaptor
     global net
     net = Mininet(topo=topo, link = TCLink,
                   controller=lambda name: RemoteController(name, ip='127.0.0.1'),
@@ -82,6 +90,7 @@ def startNetwork():
     info('** Starting the network\n')
     net.start()
 
+    # Used to calculate the link speed between nodes in bits per second
     def getLinkSpeed(firstnode, secondnode):
         for i in topo.linkconfigs:
             if firstnode == i[0] and secondnode == i[1]:
@@ -89,6 +98,7 @@ def startNetwork():
 
         return 0
 
+    # Local variable used to increment for number of links and switches added
     networkints = 0
 
     # Create QoS Queues
@@ -117,8 +127,10 @@ def startNetwork():
                             -- --id=@q1 create queue other-config:min-rate=%i \
                             -- --id=@q2 create queue other-config:max-rate=%i" % (interface, linkspeed, linkspeed, linkspeed, xspeed, yspeed))
 
+                    # When a interface is added, the value will increment
                     networkints += 1
 
+    # Print out the number of interfaces that has been created
     print "QoS has been set up on %i interfaces" % (networkints)
 
     info('** Running CLI\n')

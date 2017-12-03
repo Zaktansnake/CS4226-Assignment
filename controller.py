@@ -23,26 +23,29 @@ class Controller(EventMixin):
     def __init__(self):
         self.listenTo(core.openflow)
         core.openflow_discovery.addListeners(self)
-        self.macmap = {}
+        # Used to store MAC address and ports
+        self.macandport = {}
         # For Premium Service Class
         self.psc = {}
         return
         
     # You can write other functions as you need.
-    def _handle_PacketIn (self, event):    
-        # install entries to the route table
+    def _handle_PacketIn (self, event):
+        # For local variable reference
         packet = event.parsed
         dpid = event.dpid
         port = event.port
         source = packet.src
         destination = packet.dst
 
+        # install entries to the route table
         def install_enqueue(event, packet, outport, q_id):
             log.info("Installing flow for %s:%i -> %s:%i", source, port, destination, outport)
             message = of.ofp_flow_mod()
             message.match = of.ofp_match.from_packet(packet, port)
             message.actions.append(of.ofp_action_enqueue(port = outport, queue_id = q_id))
             message.data = event.ofp
+            # Set to Premium Service Channel priority
             message.priority = 1000
             event.connection.send(message)
             log.info("Packet with queue ID %i sent via port %i\n", q_id, outport)
@@ -52,14 +55,15 @@ class Controller(EventMixin):
         def forward(message = None):
             log.info("Receiving packet %s from port %i", packet, port)
 
-            # Store the port from where the packet comes from
-            if self.macmap[dpid].get(source) == None:
-                self.macmap[dpid][source] = port
+            # Store the port from where the packet comes from if empty
+            if self.macandport[dpid].get(source) == None:
+                self.macandport[dpid][source] = port
 
-            # Get source and destination IP address
+            # Get source and destination IP address from the packet
             sourceip = None
             destinationip = None
 
+            # Checks the packet type to determine where to send the packet
             if packet.type == packet.IP_TYPE:
                 log.info("Packet is IP type %s", packet.type)
                 ippacket = packet.payload
@@ -78,35 +82,30 @@ class Controller(EventMixin):
             # Check if source and destination ip is in same premium service class
             qid = 0
 
+            # If there is no address, packet is sent to the default queue 0
+            # If the IP addresses are in the same switch, packet is sent to queue 1
+            # If IP addresses are different and no in the same switch, packet is sent to queue 2
             if sourceip == None or destinationip == None:
                 qid = 0
-            elif isSameClass(sourceip, destinationip):
+            elif is_same_class(sourceip, destinationip):
                 qid = 1
             else:
                 qid = 2
 
-            # If multicast, flood
+            # If packet desinations indicates it is a multicast, packet is flooded
             if destination.is_multicast:
                 flood("Multicast to Port %s -- flooding" % (destination))
                 return
 
-            # If destination port is not found, flood
-            if destination not in self.macmap[dpid]:
+            # If packet destination port is not found, packet is flooded
+            if destination not in self.macandport[dpid]:
                 flood("Destination Port %s unknown -- flooding" % (destination))
                 return
 
-            outport = self.macmap[dpid][destination]
+            # Install the packet to the route table
+            outport = self.macandport[dpid][destination]
             install_enqueue(event, packet, outport, qid)
             return
-
-        # Check if IPs belong to same premium service class
-        def isSameClass(sourceip, destinationip):
-            for i in self.psc[dpid]:
-                if sourceip in i and destination in i:
-                    log.info("Source IP %s and Destination IP %s are in the same Premium Service Class", sourceip, destinationip)
-                    return True
-            log.info("Source IP %s and Destination IP %s are not in the same Premium Service Class", sourceip, destinationip)
-            return False
 
         # When it knows nothing about the destination, flood but don't install the rule
         def flood (message = None):
@@ -119,25 +118,43 @@ class Controller(EventMixin):
             log.info("Flood Message sent via port %i\n", of.OFPP_FLOOD)
             return
 
+        # Check if IPs belong to same premium service class
+        def is_same_class(sourceip, destinationip):
+            for i in self.psc[dpid]:
+                if sourceip in i and destination in i:
+                    log.info("Source IP %s and Destination IP %s are in the same Premium Service Class", sourceip,
+                             destinationip)
+                    return True
+            log.info("Source IP %s and Destination IP %s are not in the same Premium Service Class", sourceip,
+                     destinationip)
+            return False
+
         forward()
         return
 
 
     def _handle_ConnectionUp(self, event):
+        # Local variable for reference
         dpid = event.dpid
         log.debug("Switch %s has come up.", dpid)
 
-        self.macmap[dpid] = {}
+        # Empty the mac map and premium service class list each time a new mininet topology is used
+        self.macandport[dpid] = {}
         self.psc[dpid] = []
 
+        # Reads in policy.in file for Firewall rules
         filename = "policy.in"
         filereader = open(filename, "r")
         firstline = filereader.readline().split(' ')
 
+        # First line of the file indicates the number of policies, followed by number of Premium Service Class
         numofpolicies = int(firstline[0])
         numofpsc = int(firstline[1])
+
+        # fpolicies is used to store the Firewall Policies that are written from second line onwards
         fpolicies = []
 
+        # Lines from the file are read in and stores Firewall Policies
         for i in xrange(numofpolicies):
             line = filereader.readline().strip().split(',')
             source = line[0]
@@ -145,6 +162,7 @@ class Controller(EventMixin):
             port = line[2]
             fpolicies.append((source, destination, port))
 
+        # After lines are read for Firewall Policies, lines are read for Premium Service Class
         for j in xrange(numofpsc):
             line = filereader.readline().strip().split(',')
             self.psc[dpid].append(line)
@@ -187,9 +205,11 @@ class Controller(EventMixin):
             log.info("Firewall Policy: source = %s, destination = %s, port = %s", source, destination, port)
             return
 
+        # Calls the function sendFirewallPolicy for all policies
         for i in fpolicies:
             sendFirewallPolicy(event.connection, i)
 
+        # Does not need to call additional methods for Premium Service Classes
         for j in self.psc:
             pass
 
