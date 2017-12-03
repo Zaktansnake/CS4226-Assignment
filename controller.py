@@ -23,7 +23,7 @@ class Controller(EventMixin):
     def __init__(self):
         self.listenTo(core.openflow)
         core.openflow_discovery.addListeners(self)
-        self.macToPort = {}
+        self.macmap = {}
         # For Premium Service Class
         self.psc = {}
         return
@@ -53,7 +53,7 @@ class Controller(EventMixin):
             log.info("Receiving packet %s from port %i", packet, port)
 
             # Store the port from where the packet comes from
-            self.macToPort[dpid][source] = port
+            self.macmap[dpid][source] = port
 
             # Get source and destination IP address
             sourceip = None
@@ -90,11 +90,11 @@ class Controller(EventMixin):
                 return
 
             # If destination port is not found, flood
-            if destination not in self.macToPort[dpid]:
+            if destination not in self.macmap[dpid]:
                 flood("Destination Port %s unknown -- flooding" % (destination))
                 return
 
-            outport = self.macToPort[dpid][destination]
+            outport = self.macmap[dpid][destination]
             install_enqueue(event, packet, outport, qid)
             return
 
@@ -126,7 +126,7 @@ class Controller(EventMixin):
         dpid = dpid_to_str(event.dpid)
         log.debug("Switch %s has come up.", dpid)
 
-        self.macToPort[dpid] = {}
+        self.macmap[dpid] = {}
         self.psc[dpid] = []
 
         filename = "policy.in"
