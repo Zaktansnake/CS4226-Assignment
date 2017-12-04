@@ -11,7 +11,7 @@ from mininet.cli import CLI
 from mininet.topo import Topo
 
 # Used TCLink instead of original mininet Link for implementation
-from mininet.link import TCLink
+from mininet.link import Link
 
 from mininet.node import RemoteController
 
@@ -82,7 +82,7 @@ def startNetwork():
 
     # Changed server IP to 127.0.0.1 for the host-only adaptor (Implementation)
     global net
-    net = Mininet(topo=topo, link = TCLink,
+    net = Mininet(topo=topo, link = Link,
                   controller=lambda name: RemoteController(name, ip='127.0.0.1'),
                   listenPort=6633, autoSetMacs=True)
 
@@ -116,8 +116,8 @@ def startNetwork():
                     firstnode = linkinfo["node1"]
                     secondnode = linkinfo["node2"]
                     linkspeed = getLinkSpeed(firstnode, secondnode)
-                    xspeed = 100000000 # 100 mbps
-                    yspeed = 50000000 # 50 mbps
+                    xspeed = linkspeed * 8/10 # bandwith * 0.8 for normal queues (Task 3)
+                    yspeed = linkspeed * 5/10 # bandwidth * 0.5 for Premium Service Class (Task 4)
 
                     # OS System Call
                     os.system("sudo ovs-vsctl -- set Port %s qos=@newqos \

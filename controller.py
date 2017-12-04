@@ -80,9 +80,9 @@ class Controller(EventMixin):
             # If there is no address, packet is sent to a default queue 0
             # If the IP addresses are in the list of PSC, packet is sent via the Premium Queue (Task 4)
             # If IP addresses are different and not in the list of PSC, packet is sent via the Normal Queue (Task 3)
-            if sourceip == None or destinationip == None:
+            if destinationip == None:
                 qid = 0
-            elif is_same_class(sourceip, destinationip):
+            elif is_in_psc(destinationip):
                 qid = 1
             else:
                 qid = 2
@@ -114,14 +114,12 @@ class Controller(EventMixin):
             return
 
         # Check if IPs belong to the list of premium service class (Task 4)
-        def is_same_class(sourceip, destinationip):
+        def is_in_psc(destinationip):
             for i in self.psc[dpid]:
-                if sourceip in i and destination in i:
-                    log.info("Source IP %s and Destination IP %s are in the same Premium Service Class", sourceip,
-                             destinationip)
+                if destinationip in i:
+                    log.info("Destination IP %s is in list of Premium Service Class", destinationip)
                     return True
-            log.info("Source IP %s and Destination IP %s are not in the same Premium Service Class", sourceip,
-                     destinationip)
+            log.info("Destination IP %s is not in list of Premium Service Class", destinationip)
             return False
 
         forward()
