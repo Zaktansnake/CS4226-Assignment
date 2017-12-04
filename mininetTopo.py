@@ -9,10 +9,7 @@ from mininet.net import Mininet
 from mininet.log import setLogLevel, info
 from mininet.cli import CLI
 from mininet.topo import Topo
-
-# Used TCLink instead of original mininet Link for implementation
 from mininet.link import Link
-
 from mininet.node import RemoteController
 
 net = None
